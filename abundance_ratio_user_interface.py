@@ -70,7 +70,7 @@ def compute_model(params: dict) -> dict:
         "beta": beta,
         "t": t.tolist(),
         "R": R.tolist(),
-        "R_at_8Myr": float(target_R),
+        "R_at_8Gyr": float(target_R),
     }
 
 
@@ -81,11 +81,11 @@ st.sidebar.markdown("---")
 st.sidebar.write("### Model output")
 st.sidebar.write({k: v for k, v in output.items() if k in ("alpha", "nu_eff", "yield_ratios", "lambda_SLR", "beta")})
 
-ratio_at_8 = output.get("R_at_8Myr")
+ratio_at_8 = output.get("R_at_8Gyr")
 if ratio_at_8 is not None and np.isfinite(ratio_at_8):
-    st.sidebar.metric("R(t = 8 Myr)", f"{ratio_at_8:.4g}")
+    st.sidebar.metric("R(t = 8 Gyr)", f"{ratio_at_8:.4g}")
 else:
-    st.sidebar.write("R(t = 8 Myr) is undefined for the current parameters.")
+    st.sidebar.write("R(t = 8 Gyr) is undefined for the current parameters.")
 
 # prepare arrays for plotting
 t_arr = np.array(output["t"])
