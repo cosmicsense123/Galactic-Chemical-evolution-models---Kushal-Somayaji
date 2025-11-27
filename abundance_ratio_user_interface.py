@@ -8,7 +8,7 @@ def configure_sidebar() -> dict:
     st.sidebar.markdown("Use the sliders below to adjust the parameters of the model.")
     alpha = st.sidebar.slider("Inflow rate (alpha)", min_value=0.0, max_value=1.0, value=0.5, step=0.01)
     nu_eff = st.sidebar.slider("Effective consumtion rate (nu_eff)", min_value=0.0, max_value=1.0, value=0.5, step=0.01)
-    lambda_SLR = st.sidebar.number_input("SLR decay rate ($\\lambda_{SLR}$ Myr)", min_value=0.0, max_value=1000.0, value=1.0)
+    lambda_SLR = st.sidebar.number_input("SLR decay rate ($\\lambda_{SLR}$ 1/Gyr)", min_value=0.0, max_value=1000.0, value=1.0)
     # keep the input in the sidebar so all controls are together
     yield_ratios = st.sidebar.number_input("Yield ratios ($Y_{SLR}/Y_{Stable}$)", min_value=0.0, max_value=100.0, value=0.0)
     return dict(alpha=alpha, nu_eff=nu_eff, yield_ratios=yield_ratios, lambda_SLR=lambda_SLR)
@@ -112,6 +112,6 @@ st.write("Use the sidebar sliders to change parameters; output updates live.")
 st.json(output)
 
 if ratio_at_8 is not None and np.isfinite(ratio_at_8):
-    st.write(f"R(8 Myr) = {ratio_at_8:.6g}")
+    st.write(f"R(8 Gyr) = {ratio_at_8:.6g}")
 else:
-    st.write("R(8 Myr) is undefined for the current parameters.")
+    st.write("R(8 Gyr) is undefined for the current parameters.")
