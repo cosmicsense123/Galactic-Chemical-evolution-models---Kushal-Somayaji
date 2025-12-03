@@ -1,40 +1,103 @@
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
+import os, sys
+# Make the repo root importable so we can load slr_config.py from the parent dir
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from slr_config import SLR_DATA, lambda_per_Gyr, mean_life_Myr, mass_number
 
 
 def configure_sidebar() -> dict:
     st.sidebar.title("Adjust parameters")
-    st.sidebar.markdown("Use the controls to set the model and plotting options.")
+    st.sidebar.markdown("Pick an isotope pair from the list **or** enter a custom pair.")
 
-    # Inflow/consumption sliders
+    mode = st.sidebar.radio("Parameter mode", ["Pre-calculated", "Custom"], index=0)
+
+    if mode == "Pre-calculated":
+        # Build dropdown of available pairs from SLR_DATA
+        pair_to_data = {f"{d['slr']}/{d['stable']}": d for d in SLR_DATA}
+        pair_options = sorted(pair_to_data.keys())
+        selected_pair = st.sidebar.selectbox("Isotope pair", pair_options, index=0)
+        d = pair_to_data[selected_pair]
+
+        # Auto-fill from the data file
+        y_ratio = float(d['yield_ratio'])
+        t_half_myr = float(d['half_life_Myr'])
+        lambda_SLR = lambda_per_Gyr(t_half_myr)
+        A_SLR = mass_number(d['slr'])
+        A_st  = mass_number(d['stable'])
+        slr_label = d['slr']
+        stable_label = d['stable']
+
+    else:
+        # Custom entry: labels, yields, decay parameters
+        st.sidebar.subheader("Custom isotope pair")
+        slr_label = st.sidebar.text_input("SLR label (e.g., 97Tc)", value="97Tc").strip()
+        stable_label = st.sidebar.text_input("Stable label (e.g., 98Mo)", value="98Mo").strip()
+
+        y_ratio = st.sidebar.number_input("Yield ratio P_R/P_S (number)", min_value=0.0, max_value=10.0, value=3.8e-3, step=1e-4, format="%e")
+
+        decay_mode = st.sidebar.radio("Enter decay as:", ["Half-life (Myr)", "Lambda (1/Gyr)"], index=0)
+        if decay_mode == "Half-life (Myr)":
+            t_half_myr = st.sidebar.number_input("SLR half-life t₁/₂ (Myr)", min_value=0.0, max_value=5000.0, value=2.6, step=0.1)
+            lambda_SLR = lambda_per_Gyr(max(t_half_myr, 1e-12))
+        else:
+            lambda_SLR = st.sidebar.number_input("SLR decay λ (1/Gyr)", min_value=0.0, max_value=1e5, value=266.6, step=0.1)
+            # Back-compute half-life only for display
+            t_half_myr = (np.log(2.0) / max(lambda_SLR, 1e-12)) * 1e3
+
+        # Mass numbers (pre-fill from labels, allow override)
+        try:
+            A_SLR_default = mass_number(slr_label)
+        except Exception:
+            A_SLR_default = 1
+        try:
+            A_st_default = mass_number(stable_label)
+        except Exception:
+            A_st_default = 1
+        A_SLR = st.sidebar.number_input("A_SLR (mass number)", min_value=1, max_value=300, value=int(A_SLR_default), step=1)
+        A_st  = st.sidebar.number_input("A_stable (mass number)", min_value=1, max_value=300, value=int(A_st_default), step=1)
+
+        selected_pair = f"{slr_label}/{stable_label}"
+
+    # Inflow/consumption sliders (common)
+    st.sidebar.markdown("---")
     alpha = st.sidebar.slider("Inflow rate α (1/Gyr)", min_value=0.0, max_value=2.0, value=1.0, step=0.01)
     nu_eff = st.sidebar.slider("Effective consumption rate ν_eff (1/Gyr)", min_value=0.0, max_value=2.0, value=0.4, step=0.01)
-
-    # Choose how to enter decay: half-life (Myr) or lambda (1/Gyr)
-    decay_mode = st.sidebar.radio("Enter SLR decay as:", ["Half-life (Myr)", "Lambda (1/Gyr)"], index=0)
-    if decay_mode == "Half-life (Myr)":
-        t_half_myr = st.sidebar.number_input("SLR half-life t₁/₂ (Myr)", min_value=0.0, max_value=5000.0, value=2.6, step=0.1, help="Converted internally: λ = ln 2 / t₁/₂, with units converted to 1/Gyr")
-        lambda_SLR = (np.log(2.0) / max(t_half_myr, 1e-12)) * 1000.0  # convert 1/Myr -> 1/Gyr
-    else:
-        lambda_SLR = st.sidebar.number_input("SLR decay rate λ (1/Gyr)", min_value=0.0, max_value=5000.0, value=266.6, step=0.1)
-
-    # Yield ratio y_SLR/y_st
-    y_ratio = st.sidebar.number_input("Yield ratio y_SLR / y_st (dimensionless)", min_value=0.0, max_value=1.0, value=3.8e-3, step=1e-4, format="%e")
 
     st.sidebar.markdown("---")
     # Optional number-abundance conversion
     show_number = st.sidebar.checkbox("Show number ratio (× A_st/A_SLR)", value=False)
-    A_SLR = st.sidebar.number_input("A_SLR (mass number)", min_value=1, max_value=300, value=97, step=1)
-    A_st  = st.sidebar.number_input("A_stable (mass number)", min_value=1, max_value=300, value=98, step=1)
 
     st.sidebar.markdown("---")
     # Plot options
     t_max = st.sidebar.slider("Plot to t_max (Gyr)", min_value=1.0, max_value=15.0, value=8.0, step=0.5)
     yscale = st.sidebar.selectbox("Y-axis scale", ["log", "linear"], index=0)
 
-    return dict(alpha=alpha, nu_eff=nu_eff, y_ratio=y_ratio, lambda_SLR=lambda_SLR,
-                show_number=show_number, A_SLR=A_SLR, A_st=A_st, t_max=t_max, yscale=yscale)
+    # Display the constants (read-only summary)
+    with st.sidebar.expander("Pair details", expanded=False):
+        st.write({
+            "mode": mode,
+            "pair": selected_pair,
+            "y_ratio (number)": y_ratio,
+            "t1/2 (Myr)": t_half_myr,
+            "lambda (1/Gyr)": lambda_SLR,
+            "A_SLR": A_SLR,
+            "A_stable": A_st,
+        })
+
+    return dict(
+        selected_pair=selected_pair,
+        alpha=alpha,
+        nu_eff=nu_eff,
+        y_ratio=y_ratio,
+        lambda_SLR=lambda_SLR,
+        show_number=show_number,
+        A_SLR=A_SLR,
+        A_st=A_st,
+        t_max=t_max,
+        yscale=yscale,
+    )
 
 
 results = configure_sidebar()
@@ -134,7 +197,17 @@ output = compute_model(results)
 
 st.sidebar.markdown("---")
 st.sidebar.write("### Model output (current)")
-summary = {k: output[k] for k in ("alpha", "nu_eff", "y_ratio", "lambda_SLR", "beta", "A_SLR", "A_st", "show_number")}
+summary = {
+    "pair": results.get("selected_pair"),
+    "alpha": output["alpha"],
+    "nu_eff": output["nu_eff"],
+    "beta": output["beta"],
+    "y_ratio": output["y_ratio"],
+    "lambda_SLR": output["lambda_SLR"],
+    "A_SLR": output["A_SLR"],
+    "A_st": output["A_st"],
+    "show_number": output["show_number"],
+}
 st.sidebar.write(summary)
 
 ratio_at_8 = output.get("R_at_8Gyr")
@@ -164,9 +237,10 @@ plt.xlabel('time (Gyr)')
 label_kind = "Number ratio" if results.get("show_number") else "Mass ratio"
 plt.ylabel(r'$\mathcal{R}(t)$' + (" (number)" if results.get("show_number") else " (mass)"))
 
+selected_pair = results.get("selected_pair", "")
 title = (
-    f"{label_kind}: y_SLR/y_st={output['y_ratio']}, "
-    f"lambda={output['lambda_SLR']}, alpha={output['alpha']}, nu_eff={output['nu_eff']} ( beta={output['beta']:.3g} )"
+    f"{label_kind} for {selected_pair}: y_SLR/y_st={output['y_ratio']}, "
+    f"lambda={output['lambda_SLR']:.3f}, alpha={output['alpha']}, nu_eff={output['nu_eff']} ( beta={output['beta']:.3g} )"
 )
 plt.title(title)
 plt.grid(True)
@@ -186,6 +260,7 @@ else:
 
 # Show a compact JSON of arrays length only
 st.write({
+    "pair": results.get("selected_pair"),
     "t_max": output.get("t_max"),
     "num_points": len(output.get("t", [])),
     "A_SLR": output.get("A_SLR"),
