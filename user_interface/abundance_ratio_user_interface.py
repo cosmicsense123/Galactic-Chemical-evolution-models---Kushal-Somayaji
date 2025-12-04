@@ -63,7 +63,7 @@ def configure_sidebar() -> dict:
     # Inflow/consumption sliders (common)
     st.sidebar.markdown("---")
     alpha = st.sidebar.slider("Inflow rate α (1/Gyr)", min_value=0.0, max_value=2.0, value=1.0, step=0.01)
-    nu_eff = st.sidebar.slider("Effective consumption rate ν_eff (1/Gyr)", min_value=0.0, max_value=2.0, value=0.4, step=0.01)
+    nu_eff = st.sidebar.slider("Effective consumption rate ν_eff (1/Gyr)", min_value=0.0, max_value=1.0, value=0.4, step=0.01)
 
     st.sidebar.markdown("---")
     # Optional number-abundance conversion
